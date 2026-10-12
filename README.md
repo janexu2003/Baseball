@@ -45,6 +45,6 @@ Statcast downloads are cached as parquet files on first run, so later runs are f
 https://docs.google.com/spreadsheets/d/1l9Aji8jOUwCO1sdpdPhoBPiFYn_QzAKk5FTwtRjfboo/edit?usp=sharing
 
 **Pitching biomechanics:**       
-<video src="https://github.com/user-attachments/assets/60b4faf4-9c51-46f0-b04e-0fed38bf668e" width="500" controls></video>
+https://github.com/user-attachments/assets/60b4faf4-9c51-46f0-b04e-0fed38bf668e
 
 
