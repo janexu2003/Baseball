@@ -96,8 +96,6 @@ v_i = \text{base}_s + \text{drift}_j \, (\text{pc}_i - 40) - \text{slope}_j \cdo
 
 All $z \sim \mathcal{N}(0, 1)$ (non-centered form).
 
-All $z \sim \mathcal N(0, 1)$ (non-centered form).
-
 - `base_s`: that start's velocity around pitch 40 (`PC_CENTER = 40`), varying around the pitcher's usual velocity `base_j` by about σ_base ≈ 0.7 mph.
 - `base_j`: the pitcher's usual velocity; prior centered on the league-average fastball velocity $\bar v$.
 - `drift_j`: a gentle linear change across the **whole** start (mph per pitch). Centered at pitch 40 so it doesn't distort `base_s`.
