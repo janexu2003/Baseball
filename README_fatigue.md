@@ -36,10 +36,13 @@ Development run: **2,008 starts, 40 pitchers, 62,621 fastballs.**
 
 For pitch *i* in start *s* by pitcher *j*:
 
-initial model:
+Initial model:
 
-$$v_{i} = \text{base}_s - \text{slope}_j \cdot h(\text{pc}_i - \tau_s) + \varepsilon_i,\qquad
-\tau_s = \tau_j + X_s\beta + \sigma_\tau z_s$$
+$$v_{i} = \text{base}_s - \text{slope}_j \cdot h(\text{pc}_i - \tau_s) + \varepsilon_i,
+\qquad \varepsilon_i \sim \mathcal N(0, \sigma)
+$$
+
+$$ \tau_s = \tau_j + X_s\beta + \sigma_\tau z_s$$
 
 
 Add drift:
@@ -59,6 +62,56 @@ $$
 - `h(x) = 3·softplus(x/3)`: a smooth hinge, ≈ 0 before τ and ≈ linear after. A hard `max(0, x)` has no gradient at the corner and NUTS struggles with it.
 
 **Hierarchy (partial pooling).** `τ_j`, `slope_j`, `drift_j`, and `base_j` are pitcher-level and drawn from league distributions, so a pitcher with few starts is pulled toward the league and one with many starts stands on his own data. All of it uses the non-centered form (`mean + sd × z`).
+
+
+## Detailed Version
+
+Initial model:
+
+$$v_{i} = \text{base}_s - \text{slope}_j \cdot h(\text{pc}_i - \tau_s) + \varepsilon_i,
+\qquad \varepsilon_i \sim \mathcal N(0, \sigma)$$
+
+Add drift:
+
+$$v_i = \text{base}_s \;+\; \text{drift}_j\,(\text{pc}_i - 40) \;-\; \text{slope}_j \cdot h(\text{pc}_i - \tau_s) \;+\; \varepsilon_i,
+\qquad \varepsilon_i \sim \mathcal N(0, \sigma)$$
+
+**Start level** (one value per start *s*):
+
+$$\text{base}_s = \text{base}_j + \sigma_{\text{base}}\, z^{\text{base}}_s
+  , \tau_s = \tau_j + X_s\beta + \sigma_{\tau,\text{start}}\, z^{\tau}_s$$
+
+**Pitcher level** (one value per pitcher *j*):
+
+$$\text{base}_j \sim \mathcal N(\bar v,\ 5)
+  , 
+\tau_j = \mu_\tau + \sigma_{\tau,\text{pitcher}}\, z^{\tau}_j $$
+
+$$\text{slope}_j = \exp\!\big(\mu_{\log\text{slope}} + \sigma_{\log\text{slope}}\, z^{\text{slope}}_j\big)
+  ,   
+\text{drift}_j = \mu_{\text{drift}} + \sigma_{\text{drift}}\, z^{\text{drift}}_j$$
+
+All $z \sim \mathcal N(0, 1)$ (non-centered form).
+
+- `base_s`: that start's velocity around pitch 40 (`PC_CENTER = 40`), varying around the pitcher's usual velocity `base_j` by about σ_base ≈ 0.7 mph.
+- `base_j`: the pitcher's usual velocity; prior centered on the league-average fastball velocity $\bar v$.
+- `drift_j`: a gentle linear change across the **whole** start (mph per pitch). Centered at pitch 40 so it doesn't distort `base_s`.
+- `τ_j`: the pitcher's typical changepoint. `τ_s`: that start's changepoint, the pitch count where an *extra* decline begins, shifted by temperature, rest and day/night (`X_s β`).
+- `slope_j`: the extra decline rate after τ (log-normal, so always positive).
+- `h(x) = 3·softplus(x/3)`: a smooth hinge, ≈ 0 before τ and ≈ linear after. A hard `max(0, x)` has no gradient at the corner, and NUTS struggles with it.
+
+**Hierarchy (partial pooling).** `τ_j`, `slope_j` and `drift_j` are drawn from league distributions whose means and spreads are estimated from all pitchers, so a pitcher with few starts is pulled toward the league and one with many starts stands on his own data. `base_j` has a fixed, wide prior, Normal($\bar v$, 5), instead: each pitcher has dozens of starts, so his velocity level is well determined from his own data.
+
+**Three levels of the changepoint**
+```text
+League:    μ_τ ≈ 83                              (all pitchers)
+              │  + pitcher-to-pitcher variation
+              ▼
+Pitcher:   τ_j = μ_τ + σ_τ,pitcher · z_j          e.g. Pitcher A ≈ 95, Pitcher B ≈ 70
+              │  + game conditions + start-to-start variation
+              ▼
+Start:     τ_s = τ_j + X_s β + σ_τ,start · z_s    e.g. A's start on a hot day ≈ 101
+```
 
 **Start-level covariates** (centered, so `τ_j` = a 70°F night game on normal rest):
 
@@ -81,6 +134,8 @@ $$
 | `sigma` | HalfNormal(1.5) | pitch-to-pitch noise |
 
 **Why drift was added.** Version 1 had no drift term and no way to draw a slow all-game slide except by putting the hinge *before pitch 0*, which gave several pitchers negative changepoints. With `drift_j` in the model, a steady slide is drift and τ means a real change in the rate. `month` was removed at the same time (P(β<0) = 0.24, inconclusive, and confounded with temperature).
+
+
 
 **Inference.** NumPyro NUTS, 2 chains × (1,000 warmup + 750 draws), `target_accept_prob = 0.9`, `init_to_median`. `XLA_FLAGS=--xla_force_host_platform_device_count=2` runs the chains in parallel on CPU.
 
